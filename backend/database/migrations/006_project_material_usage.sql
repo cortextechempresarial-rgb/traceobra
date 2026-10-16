@@ -1,5 +1,6 @@
 ALTER TABLE public.materials
   ALTER COLUMN stock TYPE NUMERIC(12,3) USING stock::NUMERIC(12,3),
+  ADD COLUMN IF NOT EXISTS unit VARCHAR(30) NOT NULL DEFAULT 'un.',
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS public.project_activities (
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.project_material_usage (
   activity_id UUID NOT NULL REFERENCES public.project_activities(id) ON DELETE CASCADE,
   material_id UUID REFERENCES public.materials(id) ON DELETE SET NULL,
   material_name VARCHAR(255) NOT NULL,
+  unit VARCHAR(30) NOT NULL DEFAULT 'un.',
   quantity NUMERIC(12,3) NOT NULL CHECK (quantity > 0),
   unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
   total_price NUMERIC(14,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,

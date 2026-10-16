@@ -20,7 +20,7 @@ function validateActivity(description, materials) {
 async function recordActivity(client, { companyId, projectId, userId, type, description, materials }) {
   const materialIds = [...new Set(materials.map((item) => item.material_id))];
   const result = await client.query(
-    `SELECT id, name, stock, unit_price
+    `SELECT id, name, stock, unit, unit_price
      FROM materials
      WHERE company_id = $1 AND id = ANY($2::uuid[])
      ORDER BY id
@@ -65,9 +65,9 @@ async function recordActivity(client, { companyId, projectId, userId, type, desc
     const material = materialById.get(item.material_id);
     await client.query(
       `INSERT INTO project_material_usage
-         (company_id, project_id, activity_id, material_id, material_name, quantity, unit_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [companyId, projectId, activityId, material.id, material.name, Number(item.quantity), Number(material.unit_price) || 0]
+         (company_id, project_id, activity_id, material_id, material_name, unit, quantity, unit_price)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [companyId, projectId, activityId, material.id, material.name, material.unit || 'un.', Number(item.quantity), Number(material.unit_price) || 0]
     );
   }
   return activity.rows[0];
@@ -108,6 +108,7 @@ async function getActivities(req, res) {
                json_agg(json_build_object(
                  'material_id', usage.material_id,
                  'material_name', usage.material_name,
+                 'unit', usage.unit,
                  'quantity', usage.quantity,
                  'unit_price', usage.unit_price
                )) FILTER (WHERE usage.id IS NOT NULL),

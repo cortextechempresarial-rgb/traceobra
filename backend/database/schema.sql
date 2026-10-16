@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS materials (
   name VARCHAR(255) NOT NULL,
   category VARCHAR(100),
   stock NUMERIC(12,3) DEFAULT 0,
+  unit VARCHAR(30) NOT NULL DEFAULT 'un.',
   unit_price NUMERIC(12,2) DEFAULT 0,
   updated_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -116,6 +117,7 @@ CREATE TABLE IF NOT EXISTS project_material_usage (
   activity_id UUID NOT NULL REFERENCES project_activities(id) ON DELETE CASCADE,
   material_id UUID REFERENCES materials(id) ON DELETE SET NULL,
   material_name VARCHAR(255) NOT NULL,
+  unit VARCHAR(30) NOT NULL DEFAULT 'un.',
   quantity NUMERIC(12,3) NOT NULL CHECK (quantity > 0),
   unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
   total_price NUMERIC(14,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,

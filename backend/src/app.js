@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const cors = require('cors');
 const routes = require('./routes');
 const { pool } = require('./config/db');
@@ -36,6 +38,13 @@ app.get('/api/ready', async (req, res) => {
 });
 
 app.use('/api', routes);
+
+// Serve o frontend compilado no mesmo serviço; rotas fora de /api caem no index.html (React Router).
+const distDir = path.resolve(__dirname, '../../frontend/dist');
+if (fs.existsSync(path.join(distDir, 'index.html'))) {
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api(\/|$))/, (req, res) => res.sendFile(path.join(distDir, 'index.html')));
+}
 
 app.use((err, req, res, next) => {
   console.error('Erro não tratado na API:', err.message);
