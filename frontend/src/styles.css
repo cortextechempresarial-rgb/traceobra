@@ -826,6 +826,79 @@ button, input, select {
   margin-top: 10px;
 }
 
+.page-form {
+  padding: 0;
+}
+
+.material-usage-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.material-usage-fields legend {
+  padding: 0 6px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.material-usage-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 180px) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.material-usage-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.material-usage-row input,
+.material-usage-row select {
+  min-height: 40px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+}
+
+.project-details {
+  min-width: min(70vw, 760px);
+  padding: 12px;
+}
+
+.project-change-form {
+  margin: 8px 0 16px;
+}
+
+.project-activity-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.project-activity-history article {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: normal;
+}
+
+.project-activity-history p,
+.project-activity-history ul {
+  margin-bottom: 0;
+}
+
 .coordinate-fallback > div {
   margin-top: 12px;
 }
@@ -844,6 +917,10 @@ button, input, select {
 @media (max-width: 600px) {
   .subdivision-address-grid,
   .coordinate-fallback > div {
+    grid-template-columns: 1fr;
+  }
+
+  .material-usage-row {
     grid-template-columns: 1fr;
   }
 

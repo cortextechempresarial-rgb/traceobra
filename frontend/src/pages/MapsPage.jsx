@@ -241,20 +241,16 @@ export default function MapsPage() {
 
   useEffect(() => {
     apiFetch('/maps')
-      .then((res) => res.json())
-      .then((json) => {
-        if (!json.ok) throw new Error(json.message || 'Não foi possível carregar as camadas do mapa.');
-        setItems(deduplicateLayers(json.data || []));
-      })
+      .then((response) => readApiResponse(response, 'Não foi possível carregar as camadas do mapa.'))
+      .then((result) => setItems(deduplicateLayers(result.data || [])))
       .catch((error) => setMessage(error.message || 'Não foi possível carregar as camadas do mapa.'));
   }, []);
 
   useEffect(() => {
     apiFetch('/subdivisions')
-      .then((res) => res.json())
-      .then((json) => {
-        if (!json.ok) throw new Error(json.message || 'Não foi possível carregar os loteamentos.');
-        const subdivisionList = json.data || [];
+      .then((response) => readApiResponse(response, 'Não foi possível carregar os loteamentos.'))
+      .then((result) => {
+        const subdivisionList = result.data || [];
         setSubdivisions(subdivisionList);
         setSelectedSubdivisionId((current) => current || subdivisionList[0]?.id || '');
       })
@@ -263,11 +259,8 @@ export default function MapsPage() {
 
   useEffect(() => {
     apiFetch('/projects')
-      .then((res) => res.json())
-      .then((json) => {
-        if (!json.ok) throw new Error(json.message || 'Não foi possível carregar as obras.');
-        setProjects(json.data || []);
-      })
+      .then((response) => readApiResponse(response, 'Não foi possível carregar as obras.'))
+      .then((result) => setProjects(result.data || []))
       .catch((error) => setMessage(error.message || 'Não foi possível carregar as obras.'));
   }, []);
 
@@ -292,9 +285,8 @@ export default function MapsPage() {
           }),
         });
       })
-      .then(async (response) => {
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Não foi possível salvar a localização encontrada.');
+      .then((response) => readApiResponse(response, 'Não foi possível salvar a localização encontrada.'))
+      .then((result) => {
         setSubdivisions((current) => current.map((item) => (item.id === result.data.id ? result.data : item)));
         setMessage('A localização do loteamento foi recuperada pelo endereço cadastrado.');
       })
@@ -436,11 +428,7 @@ export default function MapsPage() {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Erro ao atualizar mapa');
-      }
+      const result = await readApiResponse(response, 'Não foi possível atualizar o mapa.');
 
       const updated = result.data;
       const nextItems = items.map((item) => (item.id === updated.id ? updated : item));
@@ -470,8 +458,7 @@ export default function MapsPage() {
           metadata: { layer_group: 'terreno', status: 'planejado' },
         }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Não foi possível criar a camada.');
+      const result = await readApiResponse(response, 'Não foi possível criar a camada.');
 
       setItems((current) => [result.data, ...current]);
       setSelectedId(result.data.id);

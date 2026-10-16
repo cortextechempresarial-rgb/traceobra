@@ -54,6 +54,3 @@ WHERE project.subdivision_id IS NULL
       AND layer.company_id = project.company_id
       AND layer.metadata->>'subdivision' = 'true'
   );
-
-DELETE FROM public.map_layers
-WHERE metadata->>'subdivision' = 'true';

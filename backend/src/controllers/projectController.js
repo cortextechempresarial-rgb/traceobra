@@ -9,8 +9,9 @@ function validateActivity(description, materials) {
   if (!Array.isArray(materials) || !materials.length) {
     return 'Informe pelo menos um material utilizado e sua quantidade.';
   }
-  if (materials.some((item) => !uuidPattern.test(item.material_id || '')
-    || !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0)) {
+  if (materials.some((item) => !item || !uuidPattern.test(item.material_id || '')
+    || !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0
+    || Math.abs(Number(item.quantity) * 1000 - Math.round(Number(item.quantity) * 1000)) > 0.000001)) {
     return 'Selecione materiais válidos e informe quantidades maiores que zero.';
   }
   return null;
@@ -89,6 +90,9 @@ async function getAll(req, res) {
 }
 
 async function getActivities(req, res) {
+  if (!uuidPattern.test(req.params.id)) {
+    return res.status(400).json({ ok: false, message: 'Obra inválida.' });
+  }
   try {
     const project = await pool.query(
       'SELECT id FROM projects WHERE id = $1 AND company_id = $2',
@@ -157,15 +161,19 @@ async function create(req, res) {
     return res.status(400).json({ ok: false, message: 'Selecione um cliente válido da lista.' });
   }
 
-  const client = await pool.connect();
+  let client;
+  let transactionOpen = false;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
+    transactionOpen = true;
     const subdivision = await client.query(
       'SELECT id FROM subdivisions WHERE id = $1 AND company_id = $2',
       [subdivision_id, req.user.company_id]
     );
     if (!subdivision.rowCount) {
       await client.query('ROLLBACK');
+      transactionOpen = false;
       return res.status(404).json({ ok: false, message: 'Loteamento não encontrado nesta empresa.' });
     }
     if (client_id) {
@@ -175,6 +183,7 @@ async function create(req, res) {
       );
       if (!customer.rowCount) {
         await client.query('ROLLBACK');
+        transactionOpen = false;
         return res.status(404).json({ ok: false, message: 'Cliente não encontrado nesta empresa.' });
       }
     }
@@ -194,9 +203,10 @@ async function create(req, res) {
       materials: materials_used,
     });
     await client.query('COMMIT');
+    transactionOpen = false;
     res.status(201).json({ ok: true, data: { ...project, activity } });
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (client && transactionOpen) await client.query('ROLLBACK');
     const status = error.statusCode || (['22P02', '23503', '23514'].includes(error.code) ? 400 : 500);
     res.status(status).json({
       ok: false,
@@ -206,7 +216,7 @@ async function create(req, res) {
       error: error.message,
     });
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
@@ -243,15 +253,19 @@ async function update(req, res) {
     return res.status(400).json({ ok: false, message: 'Selecione um cliente válido da lista.' });
   }
 
-  const client = await pool.connect();
+  let client;
+  let transactionOpen = false;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
+    transactionOpen = true;
     const project = await client.query(
       'SELECT id FROM projects WHERE id = $1 AND company_id = $2 FOR UPDATE',
       [id, req.user.company_id]
     );
     if (!project.rowCount) {
       await client.query('ROLLBACK');
+      transactionOpen = false;
       return res.status(404).json({ ok: false, message: 'Obra não encontrada nesta empresa.' });
     }
     const subdivision = await client.query(
@@ -260,6 +274,7 @@ async function update(req, res) {
     );
     if (!subdivision.rowCount) {
       await client.query('ROLLBACK');
+      transactionOpen = false;
       return res.status(404).json({ ok: false, message: 'Loteamento não encontrado nesta empresa.' });
     }
     if (client_id) {
@@ -269,6 +284,7 @@ async function update(req, res) {
       );
       if (!customer.rowCount) {
         await client.query('ROLLBACK');
+        transactionOpen = false;
         return res.status(404).json({ ok: false, message: 'Cliente não encontrado nesta empresa.' });
       }
     }
@@ -289,9 +305,10 @@ async function update(req, res) {
       materials: materials_used,
     });
     await client.query('COMMIT');
+    transactionOpen = false;
     res.json({ ok: true, data: { ...result.rows[0], activity } });
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (client && transactionOpen) await client.query('ROLLBACK');
     const status = error.statusCode || (['22P02', '23503', '23514'].includes(error.code) ? 400 : 500);
     res.status(status).json({
       ok: false,
@@ -301,7 +318,7 @@ async function update(req, res) {
       error: error.message,
     });
   } finally {
-    client.release();
+    client?.release();
   }
 }
 

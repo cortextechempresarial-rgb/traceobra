@@ -8,22 +8,27 @@ async function getAll(req, res) {
     );
     res.json({ ok: true, data: result.rows });
   } catch (error) {
-    res.status(500).json({ ok: false, message: 'Erro ao listar materiais', error: error.message });
+    res.status(500).json({ ok: false, message: 'Erro ao listar materiais. Confirme se a migration de materiais foi aplicada.', error: error.message });
   }
 }
 
 async function create(req, res) {
   try {
     const { name, category = 'geral', stock = 0, unit_price = 0 } = req.body;
+    const parsedStock = Number(stock);
+    const parsedPrice = Number(unit_price);
 
-    if (!name) {
-      return res.status(400).json({ ok: false, message: 'Nome do material é obrigatório' });
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ ok: false, message: 'Nome do material é obrigatório.' });
+    }
+    if (!Number.isFinite(parsedStock) || parsedStock < 0 || !Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({ ok: false, message: 'Estoque e preço devem ser números iguais ou maiores que zero.' });
     }
 
     const result = await pool.query(
       `INSERT INTO materials (company_id, name, category, stock, unit_price)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.user.company_id, name, category, Number(stock), Number(unit_price)]
+      [req.user.company_id, name.trim(), category, parsedStock, parsedPrice]
     );
 
     res.status(201).json({ ok: true, data: result.rows[0] });

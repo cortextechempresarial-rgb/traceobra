@@ -24,6 +24,7 @@ router.get('/dashboard', dashboardController.getSummary);
 router.get('/clients', clientController.getAll);
 router.post('/clients', clientController.create);
 router.get('/projects', projectController.getAll);
+router.get('/projects/:id/activities', projectController.getActivities);
 router.post('/projects', requireRole('admin'), projectController.create);
 router.put('/projects/:id', requireRole('admin'), projectController.update);
 router.get('/tasks', taskController.getAll);

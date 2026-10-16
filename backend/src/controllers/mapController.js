@@ -25,6 +25,7 @@ async function getAll(req, res) {
       FROM map_layers m
       LEFT JOIN projects p ON p.id = m.project_id
       WHERE m.company_id = $1
+        AND COALESCE(m.metadata->>'subdivision', 'false') <> 'true'
       ORDER BY m.created_at DESC
     `, [req.user.company_id]);
 

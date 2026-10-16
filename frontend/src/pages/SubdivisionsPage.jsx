@@ -168,7 +168,22 @@ export default function SubdivisionsPage() {
             <span>A localização automática pode ser aproximada. Confira o ponto ou informe as coordenadas precisas.</span>
           </details>
           <label className="plant-file-field">Planta oficial (PDF, até 20 MB)
-            <input required type="file" accept="application/pdf,.pdf" onChange={(event) => setPlanFile(event.target.files?.[0] || null)} />
+            <input
+              required
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                if (file && file.size > 20 * 1024 * 1024) {
+                  setPlanFile(null);
+                  setError('O PDF pode ter no máximo 20 MB.');
+                  event.target.value = '';
+                  return;
+                }
+                setPlanFile(file);
+                setError('');
+              }}
+            />
           </label>
           {planFile && <span>{planFile.name}</span>}
           <button className="primary-btn" type="submit" disabled={loading || locating || !normalizeCoordinates(form.latitude, form.longitude)}>

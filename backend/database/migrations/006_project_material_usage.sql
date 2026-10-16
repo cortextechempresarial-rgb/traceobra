@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.project_material_usage (
   material_name VARCHAR(255) NOT NULL,
   quantity NUMERIC(12,3) NOT NULL CHECK (quantity > 0),
   unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
+  total_price NUMERIC(14,2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
