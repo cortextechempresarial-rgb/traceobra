@@ -31,6 +31,18 @@ function ProjectChangeForm({ project, clients, subdivisions, materials, onSave }
   const [history, setHistory] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      name: project.name,
+      client_id: project.client_id || '',
+      subdivision_id: project.subdivision_id || '',
+      status: project.status || 'planning',
+      progress: Number(project.progress || 0),
+      budget: Number(project.budget || 0),
+    }));
+  }, [project]);
+
   const submit = async (event) => {
     event.preventDefault();
     setError('');
@@ -124,7 +136,7 @@ function ProjectChangeForm({ project, clients, subdivisions, materials, onSave }
               <ul>
                 {activity.materials.map((item) => (
                   <li key={`${activity.id}-${item.material_id}`}>
-                    {item.material_name}: {Number(item.quantity).toLocaleString('pt-BR')} · R$ {Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
+                    {item.material_name}: {Number(item.quantity).toLocaleString('pt-BR')} {item.unit} · R$ {Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por unidade
                   </li>
                 ))}
               </ul>
@@ -184,7 +196,11 @@ export default function ProjectsPage() {
         }),
       });
       const result = await readApiResponse(response, 'Não foi possível cadastrar a obra.');
-      setProjects((current) => [result.data, ...current]);
+      setProjects((current) => [{
+        ...result.data,
+        client_name: clients.find((item) => item.id === result.data.client_id)?.name || '',
+        subdivision_name: subdivisions.find((item) => item.id === result.data.subdivision_id)?.name || '',
+      }, ...current]);
       setForm(initialForm());
       setSuccess('Obra cadastrada e materiais iniciais registrados no estoque e no histórico.');
       try {

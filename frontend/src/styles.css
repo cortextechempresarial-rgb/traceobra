@@ -1130,6 +1130,10 @@ th {
   margin-top: 18px;
 }
 
+.form-grid > .full-width {
+  grid-column: 1 / -1;
+}
+
 .field {
   display: flex;
   flex-direction: column;

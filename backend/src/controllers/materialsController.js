@@ -14,7 +14,7 @@ async function getAll(req, res) {
 
 async function create(req, res) {
   try {
-    const { name, category = 'geral', stock = 0, unit_price = 0 } = req.body;
+    const { name, category = 'geral', stock = 0, unit = 'un.', unit_price = 0 } = req.body;
     const parsedStock = Number(stock);
     const parsedPrice = Number(unit_price);
 
@@ -26,9 +26,9 @@ async function create(req, res) {
     }
 
     const result = await pool.query(
-      `INSERT INTO materials (company_id, name, category, stock, unit_price)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.user.company_id, name.trim(), category, parsedStock, parsedPrice]
+      `INSERT INTO materials (company_id, name, category, stock, unit, unit_price)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [req.user.company_id, name.trim(), category, parsedStock, String(unit).trim() || 'un.', parsedPrice]
     );
 
     res.status(201).json({ ok: true, data: result.rows[0] });

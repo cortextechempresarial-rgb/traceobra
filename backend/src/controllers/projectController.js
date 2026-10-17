@@ -18,7 +18,7 @@ function validateActivity(description, materials) {
 }
 
 async function recordActivity(client, { companyId, projectId, userId, type, description, materials }) {
-  const materialIds = [...new Set(materials.map((item) => item.material_id))];
+  const materialIds = [...new Set(materials.map((item) => item.material_id.toLowerCase()))];
   const result = await client.query(
     `SELECT id, name, stock, unit, unit_price
      FROM materials
@@ -36,7 +36,8 @@ async function recordActivity(client, { companyId, projectId, userId, type, desc
   const materialById = new Map(result.rows.map((material) => [material.id, material]));
   const totals = new Map();
   for (const item of materials) {
-    totals.set(item.material_id, (totals.get(item.material_id) || 0) + Number(item.quantity));
+    const materialId = item.material_id.toLowerCase();
+    totals.set(materialId, (totals.get(materialId) || 0) + Number(item.quantity));
   }
   for (const [materialId, quantity] of totals) {
     if (Number(materialById.get(materialId).stock) < quantity) {
@@ -62,7 +63,7 @@ async function recordActivity(client, { companyId, projectId, userId, type, desc
   }
 
   for (const item of materials) {
-    const material = materialById.get(item.material_id);
+    const material = materialById.get(item.material_id.toLowerCase());
     await client.query(
       `INSERT INTO project_material_usage
          (company_id, project_id, activity_id, material_id, material_name, unit, quantity, unit_price)

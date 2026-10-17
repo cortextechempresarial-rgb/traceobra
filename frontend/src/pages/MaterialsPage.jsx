@@ -4,7 +4,7 @@ import { focusFirstFormField } from '../uiActions';
 
 export default function MaterialsPage() {
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ name: '', category: 'concreto', stock: 0, unit_price: 0 });
+  const [form, setForm] = useState({ name: '', category: 'concreto', stock: 0, unit: 'un.', unit_price: 0 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
@@ -32,7 +32,7 @@ export default function MaterialsPage() {
         body: JSON.stringify(form),
       });
       await readApiResponse(response, 'Não foi possível cadastrar o material.');
-      setForm({ name: '', category: 'concreto', stock: 0, unit_price: 0 });
+      setForm({ name: '', category: 'concreto', stock: 0, unit: 'un.', unit_price: 0 });
       setSuccess('Material cadastrado.');
       loadMaterials();
     } catch (requestError) {
@@ -71,6 +71,10 @@ export default function MaterialsPage() {
             <input required type="number" min="0" step="0.001" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
           </div>
           <div className="field">
+            <label>Unidade</label>
+            <input required maxLength={30} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="Ex.: kg, m³, saco, un." />
+          </div>
+          <div className="field">
             <label>Preço unitário</label>
             <input required type="number" min="0" step="0.01" value={form.unit_price} onChange={(e) => setForm({ ...form, unit_price: Number(e.target.value) })} />
           </div>
@@ -97,7 +101,7 @@ export default function MaterialsPage() {
               <tr key={item.id}>
                 <td>{item.name}</td>
                 <td>{item.category}</td>
-                <td>{item.stock}</td>
+                <td>{Number(item.stock).toLocaleString('pt-BR')} {item.unit || 'un.'}</td>
                 <td>R$ {Number(item.unit_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}

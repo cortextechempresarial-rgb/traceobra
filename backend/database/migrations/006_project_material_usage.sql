@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS public.project_material_usage (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.project_material_usage
+  ADD COLUMN IF NOT EXISTS unit VARCHAR(30) NOT NULL DEFAULT 'un.',
+  ADD COLUMN IF NOT EXISTS total_price NUMERIC(14,2)
+    GENERATED ALWAYS AS (quantity * unit_price) STORED;
+
 CREATE INDEX IF NOT EXISTS project_activities_company_project_created_idx
   ON public.project_activities (company_id, project_id, created_at DESC);
 
