@@ -121,12 +121,26 @@ export default function MapsPage() {
   const mapElementRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const layerGroupRef = useRef(null);
+  const drawingLayerRef = useRef(null);
   const geocodeAttemptedRef = useRef(new Set());
   const [view, setView] = useState('2d');
   const [contentView, setContentView] = useState('map');
   const [mapMode, setMapMode] = useState('situation');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedSubdivisionId, setSelectedSubdivisionId] = useState('');
+  const [planImageUrl, setPlanImageUrl] = useState('');
+  const [planLoadError, setPlanLoadError] = useState('');
+  const [planPage, setPlanPage] = useState('1');
+  const [planPageCount, setPlanPageCount] = useState(0);
+  const [showPlanOverlay, setShowPlanOverlay] = useState(true);
+  const [planOpacity, setPlanOpacity] = useState(0.9);
+  const [aligningPlan, setAligningPlan] = useState(false);
+  const [alignmentPoints, setAlignmentPoints] = useState([]);
+  const [drawingArea, setDrawingArea] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [areaName, setAreaName] = useState('Área de obra');
+  const [areaStatus, setAreaStatus] = useState('em execução');
+  const [areaGroup, setAreaGroup] = useState('infraestrutura');
   const [lotSearch, setLotSearch] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('all');
   const [items, setItems] = useState([]);
@@ -165,20 +179,28 @@ export default function MapsPage() {
     : activeItems;
 
   useEffect(() => {
+    setPlanPage(String(selectedSubdivision?.plan_page || 1));
+  }, [selectedSubdivision?.id, selectedSubdivision?.plan_page]);
+
+  useEffect(() => {
     if (!mapElementRef.current || mapInstanceRef.current) return undefined;
 
     const map = L.map(mapElementRef.current).setView([0, 0], 2);
+    map.createPane('subdivisionPlanPane');
+    map.getPane('subdivisionPlanPane').style.zIndex = '350';
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
     mapInstanceRef.current = map;
     layerGroupRef.current = L.featureGroup().addTo(map);
+    drawingLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
       map.remove();
       mapInstanceRef.current = null;
       layerGroupRef.current = null;
+      drawingLayerRef.current = null;
     };
   }, []);
 
@@ -212,7 +234,7 @@ export default function MapsPage() {
       }
 
       const coordinates = normalizeCoordinates(item.latitude, item.longitude);
-      if (coordinates) {
+      if (coordinates && !(item.isSubdivision && item.plan_bounds)) {
         const markerColor = mapMode === 'billing'
           ? billingColor(metadata.payment_status || metadata.cobranca_status)
           : color;
@@ -226,8 +248,14 @@ export default function MapsPage() {
       }
     });
 
-    const bounds = featureGroup.getBounds();
-    if (bounds.isValid()) {
+    const planBounds = selectedSubdivision?.plan_bounds;
+    if (planBounds) {
+      map.fitBounds(
+        [[planBounds.south, planBounds.west], [planBounds.north, planBounds.east]],
+        { padding: [24, 24], maxZoom: 18 }
+      );
+    } else if (featureGroup.getBounds().isValid()) {
+      const bounds = featureGroup.getBounds();
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 });
     } else {
       const selected = selectedSubdivision || activeItems.find((item) => item.id === selectedId) || activeItems[0];
@@ -238,6 +266,128 @@ export default function MapsPage() {
     }
     map.invalidateSize();
   }, [items, projects, subdivisions, activeLayers, selectedId, selectedProjectId, selectedSubdivisionId, view, mapMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let loadingTask;
+    let pdfDocument;
+    let renderTask;
+
+    setPlanImageUrl('');
+    setPlanLoadError('');
+    setPlanPageCount(0);
+    if (!selectedSubdivision?.metadata?.plan_document) return undefined;
+
+    const loadPlan = async () => {
+      try {
+        const response = await apiFetch(`/subdivisions/${selectedSubdivision.id}/plan`);
+        if (!response.ok) {
+          await readApiResponse(response, 'Não foi possível carregar a planta PDF.');
+        }
+        const fileData = new Uint8Array(await response.arrayBuffer());
+        const [{ getDocument, GlobalWorkerOptions }, workerUrlModule] = await Promise.all([
+          import('pdfjs-dist'),
+          import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+        ]);
+        GlobalWorkerOptions.workerSrc = workerUrlModule.default;
+        loadingTask = getDocument({ data: fileData });
+        pdfDocument = await loadingTask.promise;
+        if (cancelled) return;
+        setPlanPageCount(pdfDocument.numPages);
+
+        const requestedPage = Number(planPage) || 1;
+        const pageNumber = Math.min(Math.max(requestedPage, 1), pdfDocument.numPages);
+        const page = await pdfDocument.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: Math.min(2, 1600 / page.getViewport({ scale: 1 }).width) });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Não foi possível preparar a imagem da planta.');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        renderTask = page.render({ canvas, canvasContext: context, viewport });
+        await renderTask.promise;
+        if (!cancelled) setPlanImageUrl(canvas.toDataURL('image/png'));
+      } catch (error) {
+        if (!cancelled) setPlanLoadError(error.message || 'Não foi possível renderizar a planta PDF.');
+      }
+    };
+
+    loadPlan();
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      loadingTask?.destroy().catch(() => {});
+    };
+  }, [selectedSubdivision?.id, selectedSubdivision?.metadata?.plan_document, planPage]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || view !== '2d' || !showPlanOverlay || !planImageUrl || !selectedSubdivision?.plan_bounds) {
+      return undefined;
+    }
+    const bounds = [
+      [selectedSubdivision.plan_bounds.south, selectedSubdivision.plan_bounds.west],
+      [selectedSubdivision.plan_bounds.north, selectedSubdivision.plan_bounds.east],
+    ];
+    const overlay = L.imageOverlay(planImageUrl, bounds, {
+      pane: 'subdivisionPlanPane',
+      opacity: planOpacity,
+      interactive: false,
+    }).addTo(map);
+    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 18 });
+    return () => overlay.remove();
+  }, [planImageUrl, planOpacity, selectedSubdivision?.id, selectedSubdivision?.plan_bounds, showPlanOverlay, view]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const previewLayer = drawingLayerRef.current;
+    if (!map || !previewLayer || view !== '2d') return undefined;
+    previewLayer.clearLayers();
+    if (drawingPoints.length > 0) {
+      const points = drawingPoints.map(({ lat, lng }) => [lat, lng]);
+      if (points.length >= 3) {
+        L.polygon(points, { color: '#f97316', fillColor: '#f97316', fillOpacity: 0.25 }).addTo(previewLayer);
+      } else {
+        L.polyline(points, { color: '#f97316', dashArray: '6 6' }).addTo(previewLayer);
+      }
+      points.forEach((point) => L.circleMarker(point, { radius: 4, color: '#fff', fillColor: '#f97316', fillOpacity: 1 }).addTo(previewLayer));
+    }
+    if (aligningPlan || drawingArea) {
+      map.getContainer().style.cursor = 'crosshair';
+      const handleMapClick = (event) => {
+        if (aligningPlan) {
+          const point = event.latlng;
+          if (alignmentPoints.length === 0) {
+            setAlignmentPoints([point]);
+            setMessage('Primeiro canto marcado. Agora clique no canto superior direito da planta no mapa.');
+          } else {
+            const first = alignmentPoints[0];
+            if (point.lat <= first.lat || point.lng <= first.lng) {
+              setMessage('O segundo clique deve ficar ao norte e a leste do primeiro canto. Tente novamente.');
+              return;
+            }
+            setAlignmentPoints([]);
+            setAligningPlan(false);
+            savePlanLayout({
+              south: first.lat,
+              west: first.lng,
+              north: point.lat,
+              east: point.lng,
+            }, planPage);
+          }
+          return;
+        }
+        setDrawingPoints((current) => [...current, event.latlng]);
+      };
+      map.on('click', handleMapClick);
+      return () => {
+        map.off('click', handleMapClick);
+        map.getContainer().style.cursor = '';
+      };
+    }
+    map.getContainer().style.cursor = '';
+    return () => map.getContainer().style.cursor = '';
+  }, [aligningPlan, alignmentPoints, drawingArea, drawingPoints, planPage, view, selectedSubdivisionId]);
 
   useEffect(() => {
     apiFetch('/maps')
@@ -470,6 +620,104 @@ export default function MapsPage() {
     }
   };
 
+  const savePlanLayout = async (bounds, page = planPage) => {
+    if (!selectedSubdivision) return;
+    const parsedPage = Number(page);
+    if (!Number.isInteger(parsedPage) || parsedPage < 1 || (planPageCount && parsedPage > planPageCount)) {
+      setMessage(`Informe uma página entre 1 e ${planPageCount || 'o total da planta'}.`);
+      return;
+    }
+    try {
+      const response = await apiFetch(`/subdivisions/${selectedSubdivision.id}/plan-layout`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_bounds: bounds || null, plan_page: parsedPage }),
+      });
+      const result = await readApiResponse(response, 'Não foi possível salvar a configuração da planta.');
+      setSubdivisions((current) => current.map((item) => (item.id === result.data.id ? result.data : item)));
+      setPlanPage(String(result.data.plan_page || page));
+      setMessage(bounds ? 'Planta alinhada e salva. Agora selecione uma obra para demarcar a área em execução.' : 'Página da planta salva.');
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível salvar a configuração da planta.');
+    }
+  };
+
+  const handleStartAlignment = () => {
+    if (!selectedSubdivision?.metadata?.plan_document) {
+      setMessage('Este loteamento não tem uma planta PDF cadastrada.');
+      return;
+    }
+    if (!planImageUrl) {
+      setMessage('Aguarde o carregamento da planta antes de iniciar o alinhamento.');
+      return;
+    }
+    setDrawingArea(false);
+    setDrawingPoints([]);
+    setAlignmentPoints([]);
+    setAligningPlan(true);
+    setMessage('No mapa, clique no canto inferior esquerdo da planta e depois no canto superior direito.');
+  };
+
+  const handleStartDrawingArea = () => {
+    if (!selectedProjectId) {
+      setMessage('Selecione a obra que está dentro deste loteamento antes de demarcar uma área.');
+      return;
+    }
+    if (!selectedSubdivision?.plan_bounds) {
+      setMessage('Alinhe e salve a planta do loteamento antes de demarcar áreas de obra.');
+      return;
+    }
+    setAligningPlan(false);
+    setAlignmentPoints([]);
+    setDrawingPoints([]);
+    setDrawingArea(true);
+    setMessage('Clique no mapa para marcar os vértices da área de obra. Use ao menos três pontos.');
+  };
+
+  const handleSaveArea = async () => {
+    if (!selectedProjectId || drawingPoints.length < 3) {
+      setMessage('Selecione uma obra e marque pelo menos três pontos no mapa.');
+      return;
+    }
+    const ring = drawingPoints.map(({ lat, lng }) => [lng, lat]);
+    ring.push(ring[0]);
+    const polygon = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: { name: areaName, status: areaStatus, layer_group: areaGroup },
+        geometry: { type: 'Polygon', coordinates: [ring] },
+      }],
+    };
+    try {
+      const response = await apiFetch('/maps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: selectedProjectId,
+          layer_name: areaName.trim() || 'Área de obra',
+          map_type: '2d',
+          polygon,
+          metadata: {
+            status: areaStatus,
+            phase: 'implantação',
+            layer_group: areaGroup,
+            source: 'Planta PDF do loteamento',
+          },
+        }),
+      });
+      const result = await readApiResponse(response, 'Não foi possível salvar a área de obra.');
+      setItems((current) => [result.data, ...current]);
+      setSelectedId(result.data.id);
+      setDraft(buildDraft(result.data));
+      setDrawingArea(false);
+      setDrawingPoints([]);
+      setMessage('Área de obra demarcada e salva na planta do loteamento.');
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível salvar a área de obra.');
+    }
+  };
+
   const geocodeSubdivisionAddress = async (addressFields) => {
     const query = [
       addressFields.street,
@@ -615,6 +863,91 @@ export default function MapsPage() {
           <span className="situation-count sold">{situationCounts.sold} concluídas/vendidas</span>
           {situationCounts.other > 0 && <span>{situationCounts.other} outras situações</span>}
         </div>
+
+        {selectedSubdivision?.metadata?.plan_document && view === '2d' && contentView === 'map' && (
+          <section className="plan-map-controls" aria-label="Planta PDF do loteamento">
+            <div>
+              <strong>Planta do loteamento</strong>
+              <span>{planLoadError || (planImageUrl ? `${planPageCount} página(s) · página ${planPage}` : 'Carregando PDF...')}</span>
+            </div>
+            <label>
+              Página
+              <input
+                type="number"
+                min="1"
+                max={planPageCount || undefined}
+                value={planPage}
+                onChange={(event) => setPlanPage(event.target.value)}
+                aria-label="Página da planta PDF"
+              />
+            </label>
+            <button type="button" className="secondary-btn" onClick={() => savePlanLayout(null, planPage)}>Salvar página</button>
+            <label className="plan-overlay-toggle">
+              <input
+                type="checkbox"
+                checked={showPlanOverlay}
+                onChange={(event) => setShowPlanOverlay(event.target.checked)}
+                disabled={!selectedSubdivision.plan_bounds}
+              />
+              Exibir sobre o mapa
+            </label>
+            <label className="plan-opacity-control">
+              Opacidade
+              <input
+                type="range"
+                min="0.3"
+                max="1"
+                step="0.05"
+                value={planOpacity}
+                onChange={(event) => setPlanOpacity(Number(event.target.value))}
+                disabled={!selectedSubdivision.plan_bounds}
+              />
+            </label>
+            <button type="button" className="secondary-btn" onClick={handleStartAlignment} disabled={aligningPlan}>
+              {selectedSubdivision.plan_bounds ? 'Ajustar alinhamento' : 'Alinhar planta no mapa'}
+            </button>
+            <button type="button" className="primary-btn" onClick={handleStartDrawingArea} disabled={!selectedSubdivision.plan_bounds || !selectedProjectId || drawingArea}>
+              Demarcar área da obra
+            </button>
+            {(aligningPlan || drawingArea) && (
+              <button type="button" className="secondary-btn" onClick={() => {
+                setAligningPlan(false);
+                setAlignmentPoints([]);
+                setDrawingArea(false);
+                setDrawingPoints([]);
+                setMessage('Ação cancelada.');
+              }}>Cancelar</button>
+            )}
+            {drawingArea && (
+              <div className="plan-area-fields">
+                <label>
+                  Nome da área
+                  <input value={areaName} onChange={(event) => setAreaName(event.target.value)} />
+                </label>
+                <label>
+                  Situação
+                  <select value={areaStatus} onChange={(event) => setAreaStatus(event.target.value)}>
+                    <option value="em execução">Em execução</option>
+                    <option value="planejado">Planejado</option>
+                    <option value="concluído">Concluído</option>
+                  </select>
+                </label>
+                <label>
+                  Grupo
+                  <select value={areaGroup} onChange={(event) => setAreaGroup(event.target.value)}>
+                    <option value="infraestrutura">Infraestrutura</option>
+                    <option value="estrutura">Estrutura</option>
+                    <option value="concretagem">Concretagem</option>
+                    <option value="vistoria">Vistoria</option>
+                  </select>
+                </label>
+                <button type="button" className="primary-btn" onClick={handleSaveArea} disabled={drawingPoints.length < 3}>
+                  Salvar área ({drawingPoints.length} pontos)
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
         {contentView === 'map' ? (
           <>

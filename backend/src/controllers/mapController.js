@@ -49,6 +49,71 @@ async function getSubdivisions(req, res) {
   }
 }
 
+async function getSubdivisionPlan(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT metadata->'plan_document' AS plan_document
+       FROM subdivisions
+       WHERE id = $1 AND company_id = $2`,
+      [req.params.id, req.user.company_id]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Loteamento não encontrado nesta empresa.' });
+    }
+    const planDocument = result.rows[0].plan_document;
+    if (!planDocument?.bucket || !planDocument?.path) {
+      return res.status(404).json({ ok: false, message: 'Este loteamento ainda não tem uma planta PDF cadastrada.' });
+    }
+
+    const storedFile = await supabase.storage.from(planDocument.bucket).download(planDocument.path);
+    if (storedFile.error) throw storedFile.error;
+    const fileBuffer = Buffer.from(await storedFile.data.arrayBuffer());
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': String(fileBuffer.length),
+      'Content-Disposition': `inline; filename="planta-${req.params.id}.pdf"`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    return res.status(200).send(fileBuffer);
+  } catch (error) {
+    console.error('Falha ao carregar planta do loteamento:', error.code || error.message);
+    return res.status(500).json({ ok: false, message: 'Não foi possível carregar o PDF privado do loteamento.' });
+  }
+}
+
+async function updateSubdivisionPlanLayout(req, res) {
+  const { plan_bounds: bounds, plan_page: page } = req.body;
+  const values = bounds
+    ? [bounds.south, bounds.west, bounds.north, bounds.east].map(Number)
+    : null;
+  const [south, west, north, east] = values || [];
+  const parsedPage = Number(page);
+  if ((values && (values.some((value) => !Number.isFinite(value))
+    || south < -90 || north > 90 || west < -180 || east > 180
+    || south >= north || west >= east))
+    || !Number.isInteger(parsedPage) || parsedPage < 1) {
+    return res.status(400).json({ ok: false, message: 'Informe limites geográficos válidos e uma página PDF existente.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE subdivisions
+       SET plan_bounds = COALESCE($1::jsonb, plan_bounds), plan_page = $2
+       WHERE id = $3 AND company_id = $4 AND metadata ? 'plan_document'
+       RETURNING *`,
+      [values ? JSON.stringify({ south, west, north, east }) : null, parsedPage, req.params.id, req.user.company_id]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Loteamento com planta não encontrado nesta empresa.' });
+    }
+    return res.json({ ok: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Falha ao salvar posicionamento da planta:', error.code || error.message);
+    return res.status(500).json({ ok: false, message: 'Não foi possível salvar o posicionamento geográfico da planta.' });
+  }
+}
+
 async function updateSubdivisionLocation(req, res) {
   const { latitude, longitude, zoom } = req.body;
   if (latitude === '' || longitude === '' || latitude == null || longitude == null) {
@@ -309,4 +374,13 @@ async function createSubdivision(req, res) {
   }
 }
 
-module.exports = { getAll, getSubdivisions, updateSubdivisionLocation, create, update, createSubdivision };
+module.exports = {
+  getAll,
+  getSubdivisions,
+  getSubdivisionPlan,
+  updateSubdivisionPlanLayout,
+  updateSubdivisionLocation,
+  create,
+  update,
+  createSubdivision,
+};

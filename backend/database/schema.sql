@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS subdivisions (
   longitude NUMERIC(9,6),
   zoom INTEGER NOT NULL DEFAULT 16,
   polygon JSONB NOT NULL DEFAULT '[]'::jsonb,
+  plan_bounds JSONB,
+  plan_page INTEGER NOT NULL DEFAULT 1 CHECK (plan_page > 0),
   address JSONB NOT NULL DEFAULT '{}'::jsonb,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
