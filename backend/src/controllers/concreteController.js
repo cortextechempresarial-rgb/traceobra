@@ -22,8 +22,8 @@ async function getAll(req, res) {
     const result = await pool.query(
       `SELECT cp.*, p.name AS project_name, ml.layer_name
        FROM concrete_pours cp
-       JOIN projects p ON p.id = cp.project_id
-       LEFT JOIN map_layers ml ON ml.id = cp.map_layer_id
+       JOIN projects p ON p.id = cp.project_id AND p.company_id = cp.company_id
+       LEFT JOIN map_layers ml ON ml.id = cp.map_layer_id AND ml.company_id = cp.company_id
        WHERE cp.company_id = $1
        ORDER BY cp.created_at DESC`,
       [req.user.company_id]

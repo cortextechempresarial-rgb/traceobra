@@ -79,8 +79,8 @@ async function getAll(req, res) {
     const result = await pool.query(`
       SELECT p.*, c.name AS client_name, s.name AS subdivision_name
       FROM projects p
-      LEFT JOIN clients c ON c.id = p.client_id
-      LEFT JOIN subdivisions s ON s.id = p.subdivision_id
+      LEFT JOIN clients c ON c.id = p.client_id AND c.company_id = p.company_id
+      LEFT JOIN subdivisions s ON s.id = p.subdivision_id AND s.company_id = p.company_id
       WHERE p.company_id = $1
       ORDER BY p.created_at DESC
     `, [req.user.company_id]);

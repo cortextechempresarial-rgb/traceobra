@@ -6,7 +6,7 @@ async function getAll(req, res) {
       SELECT t.*, p.name AS project_name, u.name AS assignee_name
       FROM tasks t
       JOIN projects p ON p.id = t.project_id
-      LEFT JOIN users u ON u.id = t.assignee_id
+      LEFT JOIN users u ON u.id = t.assignee_id AND u.company_id = p.company_id
       WHERE p.company_id = $1
       ORDER BY t.created_at DESC
     `, [req.user.company_id]);

@@ -23,7 +23,7 @@ async function getAll(req, res) {
     const result = await pool.query(`
       SELECT m.*, p.name AS project_name
       FROM map_layers m
-      LEFT JOIN projects p ON p.id = m.project_id
+      LEFT JOIN projects p ON p.id = m.project_id AND p.company_id = m.company_id
       WHERE m.company_id = $1
         AND COALESCE(m.metadata->>'subdivision', 'false') <> 'true'
       ORDER BY m.created_at DESC
