@@ -184,6 +184,7 @@ async function update(req, res) {
 
 async function createSubdivision(req, res) {
   let uploadedPath;
+  let operation = 'validar cadastro';
   try {
     const {
       name,
@@ -214,8 +215,13 @@ async function createSubdivision(req, res) {
       return res.status(400).json({ ok: false, message: 'CEP inválido. Informe 8 dígitos.' });
     }
 
+    operation = 'verificar armazenamento da planta';
     const existingBucket = await supabase.storage.getBucket(planBucket);
     if (existingBucket.error) {
+      const missingBucket = String(existingBucket.error.statusCode) === '404'
+        || /bucket not found/i.test(existingBucket.error.message || '');
+      if (!missingBucket) throw existingBucket.error;
+
       const createdBucket = await supabase.storage.createBucket(planBucket, {
         public: false,
         fileSizeLimit: '20MB',
@@ -227,12 +233,14 @@ async function createSubdivision(req, res) {
     }
 
     uploadedPath = `${req.user.company_id}/subdivisions/${randomUUID()}.pdf`;
+    operation = 'enviar planta para o armazenamento';
     const storedFile = await supabase.storage.from(planBucket).upload(uploadedPath, file.buffer, {
       contentType: 'application/pdf',
       upsert: false,
     });
     if (storedFile.error) throw storedFile.error;
 
+    operation = 'gravar loteamento no banco';
     const metadata = normalizeMetadata({
       status: 'disponível',
       phase: 'implantação',
@@ -277,18 +285,27 @@ async function createSubdivision(req, res) {
       ]
     );
 
-    const signedFile = await supabase.storage.from(planBucket).createSignedUrl(uploadedPath, 60 * 60);
     return res.status(201).json({
       ok: true,
       data: result.rows[0],
-      plan_document_url: signedFile.data?.signedUrl || null,
     });
   } catch (error) {
     if (uploadedPath) {
       await supabase.storage.from(planBucket).remove([uploadedPath]).catch(() => {});
     }
-    console.error('Falha ao criar loteamento:', error.code || error.message);
-    return res.status(500).json({ ok: false, message: 'Não foi possível enviar a planta e cadastrar o loteamento.' });
+    console.error(`Falha ao ${operation}:`, error.code || error.message);
+
+    const clientMessage = operation === 'verificar armazenamento da planta'
+      ? 'Não foi possível acessar o armazenamento da planta. Confira as credenciais e as permissões do Supabase Storage.'
+      : operation === 'enviar planta para o armazenamento'
+        ? 'Não foi possível enviar o PDF. Confira as permissões do Supabase Storage e tente novamente.'
+        : operation === 'gravar loteamento no banco'
+          ? 'A planta foi enviada, mas o loteamento não foi gravado no banco. Confira se as migrations foram aplicadas e tente novamente.'
+          : 'Não foi possível cadastrar o loteamento.';
+    const message = process.env.NODE_ENV === 'production'
+      ? clientMessage
+      : `${clientMessage} (${error.code || error.message})`;
+    return res.status(500).json({ ok: false, message });
   }
 }
 
