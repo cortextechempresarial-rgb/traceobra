@@ -9,6 +9,9 @@ export default function CompaniesPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [adminCompanyId, setAdminCompanyId] = useState('');
+  const [adminForm, setAdminForm] = useState({ name: '', email: '' });
+  const [adminCredentials, setAdminCredentials] = useState(null);
 
   const loadCompanies = () => apiFetch('/admin/companies')
     .then((response) => readApiResponse(response, 'Não foi possível carregar as empresas.'))
@@ -58,6 +61,30 @@ export default function CompaniesPage() {
       setNotice(`Empresa "${result.data.name}" atualizada.`);
     } catch (requestError) {
       setError(requestError.message || 'Não foi possível atualizar a empresa.');
+    }
+  };
+
+  const createCompanyAdmin = async (event) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    setAdminCredentials(null);
+    setLoading(true);
+    try {
+      const response = await apiFetch(`/admin/companies/${adminCompanyId}/admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adminForm),
+      });
+      const result = await readApiResponse(response, 'Não foi possível criar o administrador da empresa.');
+      setAdminCredentials({ email: result.data.email, password: result.temporary_password });
+      setAdminForm({ name: '', email: '' });
+      setAdminCompanyId('');
+      await loadCompanies();
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível criar o administrador da empresa.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -113,13 +140,24 @@ export default function CompaniesPage() {
                   <td>{company.user_count ?? '—'}</td>
                   <td>{company.status === 'active' ? 'Ativa' : 'Inativa'}</td>
                   <td>
-                    <button
-                      className="secondary-btn"
-                      type="button"
-                      onClick={() => updateCompany(company, { status: company.status === 'active' ? 'inactive' : 'active' })}
-                    >
-                      {company.status === 'active' ? 'Desativar' : 'Ativar'}
-                    </button>
+                    <div className="company-row-actions">
+                      <button
+                        className="secondary-btn"
+                        type="button"
+                        onClick={() => updateCompany(company, { status: company.status === 'active' ? 'inactive' : 'active' })}
+                      >
+                        {company.status === 'active' ? 'Desativar' : 'Ativar'}
+                      </button>
+                      {company.status === 'active' && (
+                        <button
+                          className="secondary-btn"
+                          type="button"
+                          onClick={() => setAdminCompanyId((current) => current === company.id ? '' : company.id)}
+                        >
+                          Criar admin
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -127,6 +165,36 @@ export default function CompaniesPage() {
             </tbody>
           </table>
         </div>
+        {adminCompanyId && (
+          <form className="page-form company-admin-form" onSubmit={createCompanyAdmin}>
+            <h3>Criar administrador para {companies.find((company) => company.id === adminCompanyId)?.name}</h3>
+            <label>
+              Nome
+              <input required maxLength={255} value={adminForm.name} onChange={(event) => setAdminForm((current) => ({ ...current, name: event.target.value }))} />
+            </label>
+            <label>
+              Email
+              <input required type="email" value={adminForm.email} onChange={(event) => setAdminForm((current) => ({ ...current, email: event.target.value }))} />
+            </label>
+            <button className="primary-btn" type="submit" disabled={loading}>
+              {loading ? 'Criando...' : 'Criar administrador'}
+            </button>
+          </form>
+        )}
+        {adminCredentials && (
+          <div className="form-message credentials-message" role="status">
+            <strong>Administrador criado. Guarde e entregue a senha temporária; ela não será exibida novamente.</strong>
+            <span>Email: {adminCredentials.email}</span>
+            <code>{adminCredentials.password}</code>
+            <button
+              className="secondary-btn"
+              type="button"
+              onClick={() => navigator.clipboard.writeText(`${adminCredentials.email}\n${adminCredentials.password}`)}
+            >
+              Copiar acesso
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

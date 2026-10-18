@@ -23,6 +23,7 @@ router.get('/me', authController.me);
 router.get('/admin/companies', requireRole('super_admin'), companyController.getAll);
 router.post('/admin/companies', requireRole('super_admin'), companyController.create);
 router.put('/admin/companies/:id', requireRole('super_admin'), companyController.update);
+router.post('/admin/companies/:id/admin', requireRole('super_admin'), companyController.createCompanyAdmin);
 router.use(requireCompany);
 router.get('/admin/users', requireRole('admin'), companyUserController.getAll);
 router.post('/admin/users', requireRole('admin'), companyUserController.create);

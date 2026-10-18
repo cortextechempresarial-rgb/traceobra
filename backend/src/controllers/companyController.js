@@ -1,4 +1,6 @@
 const { pool } = require('../config/db');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 async function getAll(req, res) {
   try {
@@ -40,6 +42,39 @@ async function create(req, res) {
   }
 }
 
+async function createCompanyAdmin(req, res) {
+  const { name, email } = req.body;
+  if (typeof name !== 'string' || !name.trim()
+    || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ ok: false, message: 'Informe nome e email válidos para o administrador da empresa.' });
+  }
+
+  const password = crypto.randomBytes(15).toString('base64url');
+  try {
+    const company = await pool.query(
+      `SELECT id FROM companies WHERE id = $1 AND status = 'active'`,
+      [req.params.id]
+    );
+    if (!company.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Empresa ativa não encontrada.' });
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (company_id, name, email, role, password_hash)
+       VALUES ($1, $2, $3, 'admin', $4)
+       RETURNING id, company_id, name, email, role, status`,
+      [company.rows[0].id, name.trim(), email.trim().toLowerCase(), passwordHash]
+    );
+    return res.status(201).json({ ok: true, data: result.rows[0], temporary_password: password });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ ok: false, message: 'Este email já está cadastrado.' });
+    }
+    console.error('Falha ao criar administrador da empresa:', error.code || error.message);
+    return res.status(500).json({ ok: false, message: 'Não foi possível criar o administrador da empresa.' });
+  }
+}
+
 async function update(req, res) {
   const { name, cnpj, status } = req.body;
   const parsedName = typeof name === 'string' ? name.trim() : '';
@@ -66,4 +101,4 @@ async function update(req, res) {
   }
 }
 
-module.exports = { getAll, create, update };
+module.exports = { getAll, create, createCompanyAdmin, update };

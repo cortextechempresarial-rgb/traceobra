@@ -350,6 +350,12 @@ button, input, select {
   font-size: 0.85rem;
 }
 
+.company-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .credentials-message {
   display: grid;
   gap: 8px;
