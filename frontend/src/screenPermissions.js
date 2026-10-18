@@ -13,5 +13,7 @@ export const screenOptions = [
 ];
 
 export function canAccessScreen(user, screen) {
-  return user?.role === 'admin' || user?.screen_permissions?.includes(screen) === true;
+  return user?.role === 'admin'
+    || user?.role === 'super_admin'
+    || user?.screen_permissions?.includes(screen) === true;
 }

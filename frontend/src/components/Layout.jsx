@@ -32,9 +32,21 @@ const navItems = [
   { label: 'Financeiro', path: '/financeiro', icon: Wallet },
 ];
 
-export default function Layout({ children, user, onLogout }) {
+export default function Layout({
+  children,
+  user,
+  onLogout,
+  companies = [],
+  selectedCompanyId = '',
+  onCompanySelect,
+}) {
   const visibleItems = user?.role === 'super_admin'
-    ? [{ label: 'Empresas', path: '/admin/empresas', icon: Shield }]
+    ? [
+      { label: 'Empresas', path: '/admin/empresas', icon: Shield },
+      ...(selectedCompanyId
+        ? [...navItems, { label: 'Usuários', path: '/admin/usuarios', icon: Users }]
+        : []),
+    ]
     : [
       ...navItems.filter((item) => {
         const screen = screenOptions.find((option) => option.path === item.path)?.key;
@@ -53,6 +65,22 @@ export default function Layout({ children, user, onLogout }) {
             <span>{user?.role || 'ERP'}</span>
           </div>
         </div>
+
+        {user?.role === 'super_admin' && (
+          <label className="company-context-picker">
+            Empresa ativa
+            <select
+              aria-label="Empresa ativa"
+              value={selectedCompanyId}
+              onChange={(event) => onCompanySelect?.(event.target.value)}
+            >
+              <option value="">Administração global</option>
+              {companies.filter((company) => company.status === 'active').map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <nav className="nav">
           {visibleItems.map(({ label, path, icon: Icon }) => (

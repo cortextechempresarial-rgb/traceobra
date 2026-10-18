@@ -76,15 +76,37 @@ function requireScreen(...screens) {
     if (screens.some((screen) => !validScreens.has(screen))) {
       return res.status(500).json({ ok: false, message: 'Permissão de tela inválida na configuração da API.' });
     }
-    if (req.user?.role === 'admin' || screens.some((screen) => req.user?.screen_permissions?.includes(screen))) {
+    if (req.user?.role === 'admin'
+      || (req.user?.role === 'super_admin' && req.user.company_id)
+      || screens.some((screen) => req.user?.screen_permissions?.includes(screen))) {
       return next();
     }
     return res.status(403).json({ ok: false, message: 'Seu usuário não tem acesso a esta tela.' });
   };
 }
 
-function requireCompany(req, res, next) {
-  if (!req.user?.company_id || req.user.role === 'super_admin') {
+async function requireCompany(req, res, next) {
+  if (req.user?.role === 'super_admin') {
+    const companyId = req.get('x-company-id');
+    if (!companyId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId)) {
+      return res.status(403).json({ ok: false, message: 'Selecione uma empresa para acessar seus dados.' });
+    }
+    try {
+      const result = await pool.query(
+        `SELECT id FROM companies WHERE id = $1 AND status = 'active'`,
+        [companyId]
+      );
+      if (!result.rowCount) {
+        return res.status(403).json({ ok: false, message: 'Empresa ativa não encontrada para este acesso.' });
+      }
+      req.user.company_id = result.rows[0].id;
+      return next();
+    } catch (error) {
+      console.error('Falha ao validar empresa selecionada:', error.code || error.message);
+      return res.status(500).json({ ok: false, message: 'Não foi possível validar a empresa selecionada.' });
+    }
+  }
+  if (!req.user?.company_id) {
     return res.status(403).json({ ok: false, message: 'Esta área exige uma conta vinculada a uma empresa.' });
   }
   return next();
@@ -96,7 +118,8 @@ function requireRole(...roles) {
       return res.status(401).json({ ok: false, message: 'Usuário não autenticado.' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const scopedSuperAdmin = req.user.role === 'super_admin' && Boolean(req.user.company_id);
+    if (!scopedSuperAdmin && !roles.includes(req.user.role)) {
       return res.status(403).json({ ok: false, message: 'Permissão negada para esta ação.' });
     }
 

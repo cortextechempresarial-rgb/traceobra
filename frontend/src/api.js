@@ -1,4 +1,4 @@
-import { getToken, logout } from './auth';
+import { getSelectedCompanyId, getStoredUser, getToken, logout } from './auth';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -29,6 +29,11 @@ export async function apiFetch(path, options = {}) {
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+  const user = getStoredUser();
+  const selectedCompanyId = getSelectedCompanyId();
+  if (user?.role === 'super_admin' && selectedCompanyId) {
+    headers.set('X-Company-ID', selectedCompanyId);
   }
 
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });

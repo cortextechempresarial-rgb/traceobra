@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getToken, logout } from './auth';
+import { getSelectedCompanyId, getStoredUser, getToken, logout } from './auth';
 import { apiFetch, readApiResponse } from './api';
 
-vi.mock('./auth', () => ({ getToken: vi.fn(), logout: vi.fn() }));
+vi.mock('./auth', () => ({
+  getSelectedCompanyId: vi.fn(),
+  getStoredUser: vi.fn(),
+  getToken: vi.fn(),
+  logout: vi.fn(),
+}));
 
 describe('apiFetch', () => {
   beforeEach(() => {
     vi.mocked(getToken).mockReturnValue('test-session-token');
+    vi.mocked(getStoredUser).mockReturnValue({ role: 'admin' });
+    vi.mocked(getSelectedCompanyId).mockReturnValue('');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
   });
 
@@ -51,6 +58,16 @@ describe('apiFetch', () => {
     const [, options] = fetch.mock.calls[0];
     expect(options.headers.get('Content-Type')).toBe('application/json');
     expect(options.headers.get('Authorization')).toBe('Bearer test-session-token');
+  });
+
+  it('only sends the selected company for a super admin session', async () => {
+    vi.mocked(getStoredUser).mockReturnValue({ role: 'super_admin' });
+    vi.mocked(getSelectedCompanyId).mockReturnValue('company-123');
+
+    await apiFetch('/projects');
+
+    const [, options] = fetch.mock.calls[0];
+    expect(options.headers.get('X-Company-ID')).toBe('company-123');
   });
 
   it('clears the local session when the API rejects the token', async () => {

@@ -254,6 +254,29 @@ button, input, select {
   gap: 12px;
 }
 
+.company-context-picker {
+  display: grid;
+  gap: 6px;
+  padding: 0 14px 14px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+}
+
+.company-context-picker select {
+  min-height: 38px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+}
+
+.company-context-picker option {
+  color: #17211c;
+}
+
 .company-admin-form label {
   display: grid;
   gap: 6px;

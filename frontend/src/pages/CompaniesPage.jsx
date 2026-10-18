@@ -3,7 +3,7 @@ import { apiFetch, readApiResponse } from '../api';
 
 const emptyForm = { name: '', cnpj: '' };
 
-export default function CompaniesPage() {
+export default function CompaniesPage({ onCompaniesChange }) {
   const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
@@ -15,7 +15,11 @@ export default function CompaniesPage() {
 
   const loadCompanies = () => apiFetch('/admin/companies')
     .then((response) => readApiResponse(response, 'Não foi possível carregar as empresas.'))
-    .then((result) => setCompanies(result.data || []));
+    .then((result) => {
+      const nextCompanies = result.data || [];
+      setCompanies(nextCompanies);
+      onCompaniesChange?.(nextCompanies);
+    });
 
   useEffect(() => {
     loadCompanies().catch((loadError) => setError(loadError.message));
@@ -33,7 +37,9 @@ export default function CompaniesPage() {
         body: JSON.stringify(form),
       });
       const result = await readApiResponse(response, 'Não foi possível cadastrar a empresa.');
-      setCompanies((current) => [result.data, ...current]);
+      const nextCompanies = [result.data, ...companies];
+      setCompanies(nextCompanies);
+      onCompaniesChange?.(nextCompanies);
       setForm(emptyForm);
       setNotice('Empresa cadastrada. Para permitir o acesso, crie um admin vinculado à empresa.');
     } catch (requestError) {
@@ -57,7 +63,9 @@ export default function CompaniesPage() {
         }),
       });
       const result = await readApiResponse(response, 'Não foi possível atualizar a empresa.');
-      setCompanies((current) => current.map((item) => (item.id === company.id ? result.data : item)));
+      const nextCompanies = companies.map((item) => (item.id === company.id ? result.data : item));
+      setCompanies(nextCompanies);
+      onCompaniesChange?.(nextCompanies);
       setNotice(`Empresa "${result.data.name}" atualizada.`);
     } catch (requestError) {
       setError(requestError.message || 'Não foi possível atualizar a empresa.');
