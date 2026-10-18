@@ -14,6 +14,7 @@ import {
   Map,
   ClipboardCheck,
   Shield,
+  LockKeyhole,
 } from 'lucide-react';
 import { logout } from '../auth';
 import { canAccessScreen, screenOptions } from '../screenPermissions';
@@ -43,6 +44,7 @@ export default function Layout({
   const visibleItems = user?.role === 'super_admin'
     ? [
       { label: 'Empresas', path: '/admin/empresas', icon: Shield },
+      { label: 'Segurança da conta', path: '/conta/seguranca', icon: LockKeyhole },
       ...(selectedCompanyId
         ? [...navItems, { label: 'Usuários', path: '/admin/usuarios', icon: Users }]
         : []),
@@ -53,6 +55,7 @@ export default function Layout({
         return screen && canAccessScreen(user, screen);
       }),
       ...(user?.role === 'admin' ? [{ label: 'Usuários', path: '/admin/usuarios', icon: Users }] : []),
+      { label: 'Segurança da conta', path: '/conta/seguranca', icon: LockKeyhole },
     ];
 
   return (

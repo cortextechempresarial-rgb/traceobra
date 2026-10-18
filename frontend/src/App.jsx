@@ -18,6 +18,7 @@ import { getStoredUser } from './auth';
 import { apiFetch, readApiResponse } from './api';
 import { canAccessScreen } from './screenPermissions';
 import CompanyUsersPage from './pages/CompanyUsersPage';
+import AccountSecurityPage from './pages/AccountSecurityPage';
 
 function ProtectedScreen({ user, screen, children }) {
   return canAccessScreen(user, screen)
@@ -108,6 +109,7 @@ export default function App() {
     >
       <Routes>
         {isSuperAdmin && <Route path="/admin/empresas" element={<CompaniesPage onCompaniesChange={setCompanies} />} />}
+        <Route path="/conta/seguranca" element={<AccountSecurityPage />} />
         {!companyContextReady && <Route path="*" element={<Navigate to="/admin/empresas" replace />} />}
         {companyContextReady && (
           <>

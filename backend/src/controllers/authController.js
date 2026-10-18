@@ -71,4 +71,47 @@ async function me(req, res) {
   return res.json({ ok: true, user: req.user });
 }
 
-module.exports = { login, me };
+async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body || {};
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+    return res.status(400).json({ ok: false, message: 'Informe a senha atual e a nova senha.' });
+  }
+  if (Buffer.byteLength(newPassword, 'utf8') < 8 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+    return res.status(400).json({ ok: false, message: 'A nova senha deve ter entre 8 e 72 bytes.' });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ ok: false, message: 'A nova senha deve ser diferente da senha atual.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT password_hash
+       FROM users
+       WHERE id = $1 AND status = 'active'
+       LIMIT 1`,
+      [req.user.id]
+    );
+    const user = result.rows[0];
+    if (!user || !await bcrypt.compare(currentPassword, user.password_hash || '')) {
+      return res.status(400).json({ ok: false, message: 'A senha atual está incorreta.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const update = await pool.query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE id = $2 AND status = 'active' AND password_hash = $3`,
+      [passwordHash, req.user.id, user.password_hash]
+    );
+    if (!update.rowCount) {
+      return res.status(409).json({ ok: false, message: 'A senha foi alterada em outra sessão. Entre novamente e tente de novo.' });
+    }
+
+    return res.json({ ok: true, message: 'Senha alterada com sucesso.' });
+  } catch (error) {
+    console.error('Falha ao alterar senha da conta:', error.code || error.message);
+    return res.status(500).json({ ok: false, message: 'Não foi possível alterar a senha.' });
+  }
+}
+
+module.exports = { login, me, changePassword };

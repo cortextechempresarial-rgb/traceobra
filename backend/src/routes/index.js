@@ -20,6 +20,7 @@ const router = express.Router();
 router.post('/login', authController.login);
 router.use(requireAuth, auditMutations);
 router.get('/me', authController.me);
+router.put('/account/password', authController.changePassword);
 router.get('/admin/companies', requireRole('super_admin'), companyController.getAll);
 router.post('/admin/companies', requireRole('super_admin'), companyController.create);
 router.put('/admin/companies/:id', requireRole('super_admin'), companyController.update);
