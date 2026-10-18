@@ -71,12 +71,12 @@ const validScreens = new Set([
   'finance',
 ]);
 
-function requireScreen(screen) {
+function requireScreen(...screens) {
   return (req, res, next) => {
-    if (!validScreens.has(screen)) {
+    if (screens.some((screen) => !validScreens.has(screen))) {
       return res.status(500).json({ ok: false, message: 'Permissão de tela inválida na configuração da API.' });
     }
-    if (req.user?.role === 'admin' || req.user?.screen_permissions?.includes(screen)) {
+    if (req.user?.role === 'admin' || screens.some((screen) => req.user?.screen_permissions?.includes(screen))) {
       return next();
     }
     return res.status(403).json({ ok: false, message: 'Seu usuário não tem acesso a esta tela.' });

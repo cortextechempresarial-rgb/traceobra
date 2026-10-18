@@ -270,6 +270,101 @@ button, input, select {
   font: inherit;
 }
 
+.company-user-form,
+.company-user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.company-user-form > label,
+.company-user-form-grid > label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.company-user-form input:not([type="checkbox"]),
+.company-user-form select,
+.company-user-form-grid input:not([type="checkbox"]),
+.company-user-form-grid select {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
+.screen-permission-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.screen-permission-picker legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.screen-permission-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.company-users-list {
+  display: grid;
+  gap: 12px;
+}
+
+.company-user-editor {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.company-user-editor-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+}
+
+.company-user-editor-heading span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.credentials-message {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.credentials-message code {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: #eef2f7;
+  font-size: 0.95rem;
+  user-select: all;
+}
+
 .plan-map-controls > div:first-child {
   display: grid;
   gap: 4px;
@@ -1019,7 +1114,9 @@ button, input, select {
 }
 
 @media (max-width: 600px) {
-  .company-admin-form {
+  .company-admin-form,
+  .company-user-form,
+  .company-user-form-grid {
     grid-template-columns: 1fr;
   }
 
