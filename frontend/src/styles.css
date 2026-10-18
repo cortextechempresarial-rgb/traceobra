@@ -247,6 +247,29 @@ button, input, select {
   background: #f8fafc;
 }
 
+.company-admin-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.65fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.company-admin-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.company-admin-form input {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+
 .plan-map-controls > div:first-child {
   display: grid;
   gap: 4px;
@@ -996,6 +1019,10 @@ button, input, select {
 }
 
 @media (max-width: 600px) {
+  .company-admin-form {
+    grid-template-columns: 1fr;
+  }
+
   .subdivision-address-grid,
   .coordinate-fallback > div {
     grid-template-columns: 1fr;

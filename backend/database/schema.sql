@@ -14,7 +14,15 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash TEXT,
-  role VARCHAR(100) DEFAULT 'admin',
+  screen_permissions JSONB NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(screen_permissions) = 'array'),
+  status VARCHAR(20) NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'inactive')),
+  role VARCHAR(100) DEFAULT 'admin'
+    CHECK (
+      (role = 'super_admin' AND company_id IS NULL)
+      OR (role <> 'super_admin' AND company_id IS NOT NULL)
+    ),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

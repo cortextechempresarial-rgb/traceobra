@@ -13,7 +13,14 @@ async function login(req, res) {
     }
 
     const result = await pool.query(
-      'SELECT id, company_id, name, email, role, password_hash FROM users WHERE email = $1 LIMIT 1',
+      `SELECT u.id, u.company_id, u.name, u.email, u.role, u.password_hash,
+              u.screen_permissions
+       FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.email = $1
+         AND u.status = 'active'
+         AND (u.role = 'super_admin' OR c.status = 'active')
+       LIMIT 1`,
       [email.trim().toLowerCase()]
     );
 
@@ -37,6 +44,7 @@ async function login(req, res) {
         email: user.email,
         name: user.name,
         role: user.role,
+        screen_permissions: user.screen_permissions || [],
       },
       JWT_SECRET,
       { expiresIn: '8h' }
@@ -47,9 +55,11 @@ async function login(req, res) {
       token,
       user: {
         id: user.id,
+        company_id: user.company_id,
         name: user.name,
         email: user.email,
         role: user.role,
+        screen_permissions: user.screen_permissions || [],
       },
     });
   } catch (error) {
@@ -59,10 +69,14 @@ async function login(req, res) {
 
 async function register(req, res) {
   try {
-    const { name, email, password, role = 'admin' } = req.body;
+    const { name, email, password, role = 'user' } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ ok: false, message: 'Nome, email e senha são obrigatórios.' });
+    }
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string'
+      || !['admin', 'engineer', 'user'].includes(role) || password.length < 12) {
+      return res.status(400).json({ ok: false, message: 'Informe nome, email, uma função válida e senha com pelo menos 12 caracteres.' });
     }
 
     const existing = await pool.query('SELECT 1 FROM users WHERE email = $1', [email.trim().toLowerCase()]);

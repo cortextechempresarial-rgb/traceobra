@@ -13,8 +13,10 @@ import {
   Building2,
   Map,
   ClipboardCheck,
+  Shield,
 } from 'lucide-react';
 import { logout } from '../auth';
+import { canAccessScreen, screenOptions } from '../screenPermissions';
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -31,6 +33,16 @@ const navItems = [
 ];
 
 export default function Layout({ children, user, onLogout }) {
+  const visibleItems = user?.role === 'super_admin'
+    ? [{ label: 'Empresas', path: '/admin/empresas', icon: Shield }]
+    : [
+      ...navItems.filter((item) => {
+        const screen = screenOptions.find((option) => option.path === item.path)?.key;
+        return screen && canAccessScreen(user, screen);
+      }),
+      ...(user?.role === 'admin' ? [{ label: 'Usuários', path: '/admin/usuarios', icon: Users }] : []),
+    ];
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -43,7 +55,7 @@ export default function Layout({ children, user, onLogout }) {
         </div>
 
         <nav className="nav">
-          {navItems.map(({ label, path, icon: Icon }) => (
+          {visibleItems.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={path}
               to={path}
